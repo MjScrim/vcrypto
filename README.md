@@ -1,4 +1,4 @@
-# vCrypto 🔐
+# vCrypto
 **Virtual Cryptographic Hardware Coprocessor (Linux Kernel Module)**
 
 > **Status:** Work in Progress (Active Development)
