@@ -136,6 +136,8 @@ static long vcrypto_ioctl(struct file *filep, unsigned int cmd, unsigned long ar
 			return -ENOTTY;
 	}
 
+	mutex_unlock(&chip->lock);
+
 	return 0;
 }
 
