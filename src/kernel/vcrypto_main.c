@@ -27,14 +27,14 @@ static int vcrypto_open(struct inode *inodep, struct file *filep)
 
 	if (chip->is_open) {
 		mutex_unlock(&chip->lock);
-		printk(KERN_INFO "vCrypto: \n");
+		printk(KERN_WARNING "vCrypto: PID %d attempted to open, but device is busy.\n", current->pid);
 		return -EBUSY;
 	}
 
 	chip->is_open = 1;
 	mutex_unlock(&chip->lock);
 
-	printk(KERN_INFO "vCrypto: \n");
+	printk(KERN_INFO "vCrypto: Device opened successfully by PID %d.\n", current->pid);
 	return 0;
 }
 
@@ -47,7 +47,7 @@ static int vcrypto_release(struct inode *inodep, struct file *filep)
 	chip->is_open = 0;
 	mutex_unlock(&chip->lock);
 
-	printk(KERN_INFO "vCrypto: \n");
+	printk(KERN_INFO "vCrypto: Device closed and released by PID %d.\n", current->pid);
 	return 0;
 }
 
@@ -173,7 +173,7 @@ static int __init vcrypto_init(void)
 		return ret;
 	}
 
-	printk(KERN_INFO "vCrypto: \n");
+	printk(KERN_INFO "vCrypto: Virtual coprocessor initialized and registered successfully.\n");
 	return 0;
 }
 
@@ -184,7 +184,7 @@ static void __exit vcrypto_exit(void)
 	mutex_destroy(&vcrypto_chip->lock);
 	kfree(vcrypto_chip);
 
-	printk(KERN_INFO "vCrypto: Chip was removed!\n");
+	printk(KERN_INFO "vCrypto: Virtual coprocessor removed and memory freed.\n");
 }
 
 module_init(vcrypto_init);
