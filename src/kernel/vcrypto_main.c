@@ -1,4 +1,5 @@
 #include <linux/module.h>
+#include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/device.h>
 #include <linux/string.h>
@@ -87,7 +88,7 @@ static ssize_t vcrypto_write(struct file *file, const char __user *buf,
 	}
 
 	for (i = 0; i < bytes_to_write; i++) {
-		chip->hw_buffer[i] ^= 0xAA;
+		chip->hw_buffer[i] ^= (char)chip->current_key;
 	}
 
 	mutex_unlock(&chip->lock);
@@ -113,19 +114,25 @@ static long vcrypto_ioctl(struct file *filep, unsigned int cmd, unsigned long ar
 				return -EFAULT;
 			}
 			chip->current_key = user_key;
-			printk(KERN_INFO "vCrypto: \n");
+			printk(KERN_INFO "vCrypto: PID %d set new encryption key.\n", current->pid);
 			break;
 
 		case VCRYPTO_RESET:
 			memset(chip->hw_buffer, 0, 1024);
-			printk(KERN_INFO "vCrypto: \n");
+			printk(KERN_INFO "vCrypto: PID %d triggered hardware reset.\n", current->pid);
 			break;
 
-		/*case VCRYPTO_GET_STATUS:
-			//if (copy_to_user())
-			break;*/
+		case VCRYPTO_GET_STATUS:
+			if (copy_to_user((int __user *)arg, &chip->current_key, sizeof(int))) {
+				mutex_unlock(&chip->lock);
+				return -EFAULT;
+			}
+
+			printk(KERN_INFO "vCrypto: PID %d read hardware status.\n", current->pid);
+			break;
 
 		default:
+			mutex_unlock(&chip->lock);
 			return -ENOTTY;
 	}
 
