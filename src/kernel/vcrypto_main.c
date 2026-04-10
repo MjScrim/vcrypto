@@ -121,9 +121,9 @@ static long vcrypto_ioctl(struct file *filep, unsigned int cmd, unsigned long ar
 			printk(KERN_INFO "vCrypto: \n");
 			break;
 
-		case VCRYPTO_GET_STATUS:
+		/*case VCRYPTO_GET_STATUS:
 			//if (copy_to_user())
-			break;
+			break;*/
 
 		default:
 			return -ENOTTY;
