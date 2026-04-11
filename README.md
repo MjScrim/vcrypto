@@ -22,7 +22,7 @@ The module is currently compilable and can be loaded into the kernel via `insmod
 - [x] Mutex initialization and Race Condition protection.
 - [x] File operations boilerplate (`open`, `release`, `read`, `write`).
 - [x] IOCTL interface skeleton (`VCRYPTO_SET_KEY`, `VCRYPTO_RESET`).
-- [ ] User-space CLI tool implementation for testing.
+- [x] User-space CLI tool implementation for testing.
 - [ ] Advanced encryption algorithms integration.
 
 ## Building and Loading
