@@ -1,5 +1,6 @@
 obj-m += vcrypto.o
-vcrypto-objs := vcrypto_main.o
+
+vcrypto-objs := vcrypto_main.o vcrypto_aes.o 
 ccflags-y := -I$(src)/../../include
 
 PWD := $(shell pwd)

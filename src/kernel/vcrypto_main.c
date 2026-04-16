@@ -6,13 +6,17 @@
 #include <linux/slab.h>
 #include <linux/miscdevice.h>
 #include "vcrypto_ioctl.h"
+#include "vcrypto_aes.h"
+
+#define BUFFER_SIZE 1024
 
 struct vcrypto_data {
-	char hw_buffer[1024];
+	char hw_buffer[BUFFER_SIZE];
+	size_t current_len;
+	uint8_t original_key[16];
+	uint8_t expanded_key[176];
 	struct mutex lock;
 	struct miscdevice misc_dev;
-
-	int current_key;
 	int is_open;
 };
 
@@ -57,9 +61,11 @@ static ssize_t vcrypto_read(struct file *file, char __user *buf,
 	struct miscdevice *misc = file->private_data;
 	struct vcrypto_data *chip = container_of(misc, struct vcrypto_data, misc_dev);
 
-	size_t bytes_to_read = min(count, (size_t)1024);
+	size_t bytes_to_read;
 
 	mutex_lock(&chip->lock);
+
+	bytes_to_read = min(count, chip->current_len);
 
 	if (copy_to_user(buf, chip->hw_buffer, bytes_to_read)) {
 		mutex_unlock(&chip->lock);
@@ -77,7 +83,9 @@ static ssize_t vcrypto_write(struct file *file, const char __user *buf,
 	struct miscdevice *misc = file->private_data;
 	struct vcrypto_data *chip = container_of(misc, struct vcrypto_data, misc_dev);
 
-	size_t bytes_to_write = min(count, (size_t)1024);
+	size_t max_input = BUFFER_SIZE - AES_BLOCK_SIZE;
+	size_t bytes_to_write = min(count, max_input);
+	size_t padded_len;
 	int i;
 
 	mutex_lock(&chip->lock);
@@ -87,8 +95,17 @@ static ssize_t vcrypto_write(struct file *file, const char __user *buf,
 		return -EFAULT;
 	}
 
-	for (i = 0; i < bytes_to_write; i++) {
-		chip->hw_buffer[i] ^= (char)chip->current_key;
+	padded_len = aes_apply_padding((uint8_t *)chip->hw_buffer, chip->current_len, BUFFER_SIZE);
+
+	if (padded_len == 0) {
+		mutex_unlock(&chip->lock);
+		return -ENOMEM;
+	}
+
+	chip->current_len = padded_len;
+
+	for (i = 0; i < padded_len; i += AES_BLOCK_SIZE) {
+		aes_encrypt_block((uint8_t *)&chip->hw_buffer[i], chip->expanded_key);
 	}
 
 	mutex_unlock(&chip->lock);
@@ -100,7 +117,6 @@ static long vcrypto_ioctl(struct file *filep, unsigned int cmd, unsigned long ar
 {
 	struct miscdevice *misc = filep->private_data;
 	struct vcrypto_data *chip = container_of(misc, struct vcrypto_data, misc_dev);
-	int user_key;
 
 	if (_IOC_TYPE(cmd) != VCRYPTO_MAGIC)
 		return -ENOTTY;
@@ -109,21 +125,24 @@ static long vcrypto_ioctl(struct file *filep, unsigned int cmd, unsigned long ar
 
 	switch (cmd) {
 		case VCRYPTO_SET_KEY:
-			if (copy_from_user(&user_key, (int __user *)arg, sizeof(int))) {
+			if (copy_from_user(chip->original_key, (uint8_t __user *)arg, AES_BLOCK_SIZE)) {
 				mutex_unlock(&chip->lock);
 				return -EFAULT;
 			}
-			chip->current_key = user_key;
-			printk(KERN_INFO "vCrypto: PID %d set new encryption key.\n", current->pid);
+			aes_expand_key(chip->original_key, chip->expanded_key);
+			printk(KERN_INFO "vCrypto: PID %d set new 128-bit AES key.\n", current->pid);
 			break;
 
 		case VCRYPTO_RESET:
-			memset(chip->hw_buffer, 0, 1024);
+			memset(chip->hw_buffer, 0, BUFFER_SIZE);
+			chip->current_len = 0;
+			memset(chip->expanded_key, 0, 176);
+			memset(chip->original_key, 0, 16);
 			printk(KERN_INFO "vCrypto: PID %d triggered hardware reset.\n", current->pid);
 			break;
 
 		case VCRYPTO_GET_STATUS:
-			if (copy_to_user((int __user *)arg, &chip->current_key, sizeof(int))) {
+			if (copy_to_user((uint8_t __user *)arg, chip->original_key, AES_BLOCK_SIZE)) {
 				mutex_unlock(&chip->lock);
 				return -EFAULT;
 			}
