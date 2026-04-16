@@ -16,15 +16,15 @@ int vcrypto_connect(void)
 	return fd;
 }
 
-int vcrypto_set_key(int fd, int key)
+int vcrypto_set_key(int fd, const uint8_t *key)
 {
-	if (fd < 0)
+	if (fd < 0 || !key)
 		return -1;
 
-	return ioctl(fd, VCRYPTO_SET_KEY, &key);
+	return ioctl(fd, VCRYPTO_SET_KEY, key);
 }
 
-int vcrypto_get_status(int fd, int *current_key)
+int vcrypto_get_status(int fd, uint8_t *current_key)
 {
 	if (fd < 0 || !current_key)
 		return -1;
