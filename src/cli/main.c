@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-
-/* Import our clean Ring 3 API */
 #include "../../include/vcrypto.h"
 
 #define BUFFER_SIZE 1024
@@ -11,10 +9,13 @@
 int main(void)
 {
 	int fd;
-	int new_key = 0xAA;
-	int retrieved_key = 0;
 	
-	/* Using uint8_t for strict binary data compatibility */
+	uint8_t new_key[16] = {
+		0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6,
+		0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C
+	};
+	uint8_t retrieved_key[16] = {0};
+	
 	const uint8_t plaintext[] = "MARCOS_KERNEL_HACKER";
 	uint8_t hw_buffer[BUFFER_SIZE] = {0};
 	int len = strlen((const char *)plaintext);
@@ -28,17 +29,22 @@ int main(void)
 	}
 	printf("[+] Successfully connected to Ring 0 (FD: %d).\n\n", fd);
 
-	printf("[*] Setting hardware key to 0x%X...\n", new_key);
+	printf("[*] Setting new 128-bit AES hardware key...\n");
 	if (vcrypto_set_key(fd, new_key) < 0) {
 		perror("[-] Failed to set key");
 	}
 
-	if (vcrypto_get_status(fd, &retrieved_key) == 0) {
-		printf("[+] Hardware status read. Current key: 0x%X\n\n", retrieved_key);
+	if (vcrypto_get_status(fd, retrieved_key) == 0) {
+		printf("[+] Hardware status read. Current key: ");
+		for (int i = 0; i < 16; i++) {
+			printf("%02X", retrieved_key[i]);
+		}
+		printf("\n\n");
 	}
 
 	/* Test Encryption */
 	printf("[*] Original plaintext: %s\n", plaintext);
+	
 	if (vcrypto_process(fd, plaintext, hw_buffer, len) < 0) {
 		perror("[-] Encryption failed");
 	}
@@ -50,7 +56,7 @@ int main(void)
 	printf("\n\n");
 
 	/* Test Decryption */
-	printf("[*] Decrypting payload via involutory XOR...\n");
+	printf("[*] Decrypting payload... (EXPECTING GARBAGE)\n");
 	uint8_t decrypted_buffer[BUFFER_SIZE] = {0};
 	vcrypto_process(fd, hw_buffer, decrypted_buffer, len);
 	
